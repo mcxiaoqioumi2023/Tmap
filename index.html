@@ -1,67 +1,459 @@
-package com.Tmap.app;
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>缺德地图 · 高德2.0 满血版</title>
+    <!-- 高德 JS API 2.0（HTTPS 下完美运行） -->
+    <script src="https://webapi.amap.com/maps?v=2.0&key=a95ddc6e86de2e40f7ad74dfd19f9633"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body, html { width: 100%; height: 100%; overflow: hidden; font-family: 'PingFang SC', sans-serif; }
+        #map { width: 100%; height: 100%; background: #c8e0f0; }
 
-import android.graphics.Bitmap;
-import android.os.Bundle;
-import android.webkit.GeolocationPermissions;
-import android.webkit.SslErrorHandler;
-import android.webkit.WebChromeClient;
-import android.webkit.WebSettings;
-import android.webkit.WebView;
-import android.webkit.WebViewClient;
-import android.net.http.SslError;
-import androidx.appcompat.app.AppCompatActivity;
-
-public class MainActivity extends AppCompatActivity {
-    private WebView webView;
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-
-        webView = findViewById(R.id.webview);
-        WebSettings settings = webView.getSettings();
-
-        settings.setJavaScriptEnabled(true);
-        settings.setDomStorageEnabled(true);
-        settings.setDatabaseEnabled(true);
-        settings.setGeolocationEnabled(true);
-        settings.setAllowFileAccess(true);
-        settings.setAllowContentAccess(true);
-        settings.setAllowFileAccessFromFileURLs(true);
-        settings.setAllowUniversalAccessFromFileURLs(true);
-        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-        settings.setUseWideViewPort(true);
-        settings.setBuiltInZoomControls(false);
-        settings.setDisplayZoomControls(false);
-
-        webView.setWebChromeClient(new WebChromeClient() {
-            @Override
-            public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
-                callback.invoke(origin, true, false);
-            }
-        });
-
-        webView.setWebViewClient(new WebViewClient() {
-            @Override
-            public void onPageStarted(WebView view, String url, Bitmap favicon) { }
-            @Override
-            public void onPageFinished(WebView view, String url) { }
-            @Override
-            public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
-                handler.proceed();
-            }
-        });
-
-        webView.loadUrl("file:///android_asset/index.html");
-    }
-
-    @Override
-    public void onBackPressed() {
-        if (webView.canGoBack()) {
-            webView.goBack();
-        } else {
-            super.onBackPressed();
+        /* ----- 普通模式 UI (模仿高德主页) ----- */
+        .normal-ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
         }
-    }
-}
+        .search-bar {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 80px;
+            height: 48px;
+            background: white;
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            pointer-events: auto;
+            z-index: 100;
+        }
+        .search-input {
+            flex: 1;
+            border: none;
+            outline: none;
+            font-size: 16px;
+            background: transparent;
+        }
+        .search-btn {
+            width: 40px;
+            height: 40px;
+            background: #0a7bff;
+            border-radius: 50%;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 8px;
+            font-size: 18px;
+            cursor: pointer;
+        }
+        .right-toolbar {
+            position: absolute;
+            right: 16px;
+            top: 20px;
+            width: 52px;
+            pointer-events: auto;
+            z-index: 100;
+        }
+        .tool-btn {
+            width: 52px;
+            height: 52px;
+            background: white;
+            border-radius: 50%;
+            margin-bottom: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            cursor: pointer;
+            color: #333;
+        }
+        .tool-btn span { font-size: 12px; margin-top: 2px; }
+
+        /* ----- 导航模式 UI (默认隐藏) ----- */
+        .nav-ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: none;
+            z-index: 200;
+        }
+        .nav-header {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: auto;
+        }
+        .nav-exit {
+            width: 44px;
+            height: 44px;
+            background: rgba(255,255,255,0.9);
+            border-radius: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: #333;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            cursor: pointer;
+            backdrop-filter: blur(5px);
+        }
+        .nav-info-card {
+            position: absolute;
+            bottom: 100px;
+            left: 16px;
+            right: 16px;
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+            pointer-events: auto;
+            backdrop-filter: blur(10px);
+            background: rgba(255,255,255,0.95);
+        }
+        .nav-route-info {
+            font-size: 18px;
+            font-weight: bold;
+            color: #0a7bff;
+            margin-bottom: 8px;
+        }
+        .nav-next-action {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #eee;
+        }
+
+        /* ----- 底部通用音乐播放器 (悬浮) ----- */
+        .music-player {
+            position: absolute;
+            bottom: 20px;
+            left: 16px;
+            right: 16px;
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            pointer-events: auto;
+            backdrop-filter: blur(10px);
+            background: rgba(255,255,255,0.95);
+            z-index: 300;
+        }
+        .music-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .song-info {
+            display: flex;
+            flex-direction: column;
+        }
+        .song-title { font-size: 16px; font-weight: 600; color: #222; }
+        .song-artist { font-size: 12px; color: #777; }
+        .play-btn {
+            width: 48px;
+            height: 48px;
+            background: #0a7bff;
+            border-radius: 50%;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        .lyrics {
+            margin-top: 8px;
+            font-size: 13px;
+            color: #555;
+            white-space: nowrap;
+            overflow-x: auto;
+            padding: 4px 0;
+            border-top: 1px solid #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <!-- 普通模式界面 -->
+    <div class="normal-ui" id="normalUI">
+        <div class="search-bar">
+            <input type="text" id="keyword" class="search-input" placeholder="搜索地点（如：天安门）">
+            <div class="search-btn" id="searchBtn">🔍</div>
+        </div>
+        <div class="right-toolbar">
+            <div class="tool-btn" id="zoomIn"><div>+</div><span>放大</span></div>
+            <div class="tool-btn" id="zoomOut"><div>-</div><span>缩小</span></div>
+            <div class="tool-btn" id="locateBtn"><div>📍</div><span>定位</span></div>
+            <div class="tool-btn" id="navBtn"><div>🚗</div><span>导航</span></div>
+        </div>
+    </div>
+
+    <!-- 导航模式界面 -->
+    <div class="nav-ui" id="navUI">
+        <div class="nav-header">
+            <div class="nav-exit" id="exitNavBtn">←</div>
+            <div style="width:44px;"></div>
+        </div>
+        <div class="nav-info-card" id="navInfoCard">
+            <div class="nav-route-info" id="navRouteInfo">全程 -- km，--分钟</div>
+            <div class="nav-next-action" id="navNextAction">准备路线中...</div>
+            <div style="display: flex; justify-content: space-between; color: #666; font-size: 14px;">
+                <span id="navRemainDist">🚥 剩余 -- km</span>
+                <span id="navArriveTime">🕒 --:--</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 音乐播放器（始终可见） -->
+    <div class="music-player">
+        <div class="music-row">
+            <div class="song-info">
+                <span class="song-title" id="songTitle">一路向北</span>
+                <span class="song-artist" id="songArtist">周杰伦</span>
+            </div>
+            <div class="play-btn" id="playPauseBtn">▶️</div>
+        </div>
+        <div class="lyrics" id="lyricText">🎤 等待播放或搜索歌曲</div>
+    </div>
+
+    <script>
+        // ========== 全局变量 ==========
+        let map, geolocation, placeSearch, driving;
+        let currentPos = [116.397428, 39.90923]; // 默认北京
+        let destination = null;
+        let destName = '';
+        let marker, destMarker;
+        let audio = new Audio();
+        let isPlaying = false;
+        let songId = null;
+        let lyricArray = [];
+        let lyricTimer = null;
+        let currentRoute = null;
+
+        // ========== 初始化地图 ==========
+        window.onload = function() {
+            map = new AMap.Map('map', {
+                zoom: 14,
+                center: currentPos
+            });
+
+            // 加载插件
+            AMap.plugin(['AMap.Geolocation', 'AMap.PlaceSearch', 'AMap.Driving'], function() {
+                geolocation = new AMap.Geolocation({
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    zoomToAccuracy: true
+                });
+                placeSearch = new AMap.PlaceSearch({ map: map, city: '全国' });
+                driving = new AMap.Driving({ map: map });
+
+                // 自动定位
+                autoLocate();
+            });
+
+            bindEvents();
+            searchMusic('一路向北');
+        };
+
+        // ========== 定位 ==========
+        function autoLocate() {
+            if (!geolocation) return;
+            geolocation.getCurrentPosition(function(status, result) {
+                if (status === 'complete') {
+                    currentPos = [result.position.lng, result.position.lat];
+                    map.setCenter(currentPos);
+                    if (marker) marker.setMap(null);
+                    marker = new AMap.Marker({
+                        position: currentPos,
+                        map: map,
+                        title: '我的位置'
+                    });
+                } else {
+                    console.log('定位失败，使用默认位置');
+                }
+            });
+        }
+
+        // ========== 地点搜索 ==========
+        function searchPlace(keyword) {
+            if (!keyword.trim()) {
+                alert('请输入搜索关键词');
+                return;
+            }
+            placeSearch.search(keyword, function(status, result) {
+                if (status === 'complete' && result.poiList.pois.length > 0) {
+                    let poi = result.poiList.pois[0];
+                    let lnglat = poi.location;
+                    destination = [lnglat.lng, lnglat.lat];
+                    destName = poi.name;
+                    if (destMarker) destMarker.setMap(null);
+                    destMarker = new AMap.Marker({
+                        position: destination,
+                        map: map,
+                        title: poi.name,
+                        label: { content: poi.name, offset: new AMap.Pixel(0, -25) }
+                    });
+                    map.setCenter(destination);
+                    map.setZoom(15);
+                    document.getElementById('keyword').value = poi.name; // 回显
+                } else {
+                    alert('未找到地点，请尝试更具体的关键词');
+                }
+            });
+        }
+
+        // ========== 驾车路线规划 ==========
+        function planRoute() {
+            if (!destination) {
+                alert('请先搜索目的地');
+                return;
+            }
+            driving.search(currentPos, destination, function(status, result) {
+                if (status === 'complete' && result.routes.length) {
+                    currentRoute = result.routes[0];
+                    let dist = (currentRoute.distance / 1000).toFixed(1);
+                    let time = Math.ceil(currentRoute.time / 60);
+                    document.getElementById('navRouteInfo').innerText = `全程 ${dist} km，${time} 分钟`;
+                    if (currentRoute.steps && currentRoute.steps.length) {
+                        let firstStep = currentRoute.steps[0];
+                        document.getElementById('navNextAction').innerText = firstStep.instruction || '前方300米右转';
+                    } else {
+                        document.getElementById('navNextAction').innerText = '沿当前道路行驶';
+                    }
+                    document.getElementById('navRemainDist').innerText = `🚥 剩余 ${dist} km`;
+                    let now = new Date();
+                    now.setMinutes(now.getMinutes() + time);
+                    let arriveStr = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+                    document.getElementById('navArriveTime').innerText = `🕒 ${arriveStr}`;
+                    enterNavMode();
+                } else {
+                    alert('路线规划失败');
+                }
+            });
+        }
+
+        // ========== 切换导航模式 ==========
+        function enterNavMode() {
+            document.getElementById('normalUI').style.display = 'none';
+            document.getElementById('navUI').style.display = 'block';
+        }
+
+        function exitNavMode() {
+            document.getElementById('normalUI').style.display = 'block';
+            document.getElementById('navUI').style.display = 'none';
+        }
+
+        // ========== 音乐功能 ==========
+        function searchMusic(songName) {
+            let url = `https://api.injahow.cn/meting/?server=netease&type=search&input=${encodeURIComponent(songName)}`;
+            fetch(url).then(r => r.json()).then(data => {
+                if (data.length) {
+                    let song = data[0];
+                    songId = song.id;
+                    document.getElementById('songTitle').innerText = song.name;
+                    document.getElementById('songArtist').innerText = song.artist;
+                    return fetch(`https://api.injahow.cn/meting/?server=netease&type=url&id=${songId}`);
+                }
+            }).then(r => r.json()).then(urlData => {
+                if (urlData.url) {
+                    audio.src = urlData.url;
+                    return fetch(`https://api.injahow.cn/meting/?server=netease&type=lrc&id=${songId}`);
+                }
+            }).then(r => r.text()).then(lrc => {
+                parseLyrics(lrc);
+                document.getElementById('lyricText').innerText = '🎵 已加载，点击播放';
+            }).catch(e => console.log('音乐加载失败', e));
+        }
+
+        function parseLyrics(lrc) {
+            lyricArray = [];
+            let lines = lrc.split('\n');
+            let reg = /\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)/;
+            lines.forEach(line => {
+                let m = reg.exec(line);
+                if (m) {
+                    let time = parseInt(m[1])*60 + parseInt(m[2]) + parseInt(m[3].padEnd(3,'0'))/1000;
+                    let text = m[4].trim();
+                    if (text) lyricArray.push({time, text});
+                }
+            });
+            lyricArray.sort((a,b) => a.time - b.time);
+        }
+
+        function togglePlay() {
+            if (!audio.src) {
+                searchMusic('一路向北');
+                setTimeout(togglePlay, 800);
+                return;
+            }
+            if (isPlaying) {
+                audio.pause();
+                document.getElementById('playPauseBtn').innerHTML = '▶️';
+                clearInterval(lyricTimer);
+            } else {
+                audio.play().then(() => {
+                    document.getElementById('playPauseBtn').innerHTML = '⏸️';
+                    startLyricUpdate();
+                }).catch(e => alert('请先点击页面'));
+            }
+            isPlaying = !isPlaying;
+        }
+
+        function startLyricUpdate() {
+            if (lyricTimer) clearInterval(lyricTimer);
+            lyricTimer = setInterval(() => {
+                if (!audio.currentTime || !lyricArray.length) return;
+                let t = audio.currentTime;
+                let line = '';
+                for (let i = lyricArray.length-1; i>=0; i--) {
+                    if (t >= lyricArray[i].time) { line = lyricArray[i].text; break; }
+                }
+                if (line) document.getElementById('lyricText').innerText = line;
+            }, 300);
+        }
+
+        // ========== 事件绑定 ==========
+        function bindEvents() {
+            document.getElementById('searchBtn').onclick = function() {
+                let kw = document.getElementById('keyword').value;
+                searchPlace(kw);
+            };
+            document.getElementById('keyword').onkeypress = function(e) {
+                if (e.key === 'Enter') document.getElementById('searchBtn').click();
+            };
+            document.getElementById('zoomIn').onclick = function() { map.zoomIn(); };
+            document.getElementById('zoomOut').onclick = function() { map.zoomOut(); };
+            document.getElementById('locateBtn').onclick = function() { autoLocate(); };
+            document.getElementById('navBtn').onclick = function() {
+                if (destination) planRoute(); else alert('请先搜索目的地');
+            };
+            document.getElementById('exitNavBtn').onclick = function() { exitNavMode(); };
+            document.getElementById('playPauseBtn').onclick = function() { togglePlay(); };
+            audio.onended = function() {
+                isPlaying = false;
+                document.getElementById('playPauseBtn').innerHTML = '▶️';
+                clearInterval(lyricTimer);
+            };
+        }
+    </script>
+</body>
+</html>
